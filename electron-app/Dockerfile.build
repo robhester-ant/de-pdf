@@ -1,0 +1,41 @@
+# Multi-stage build for Electron app
+FROM node:18-bullseye AS builder
+
+# Install Python and build dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    build-essential \
+    libgtk-3-0 \
+    libnotify-dev \
+    libnss3 \
+    libxss1 \
+    libasound2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Wine for Windows builds (optional)
+# RUN dpkg --add-architecture i386 && apt-get update && apt-get install -y wine wine32 wine64
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json ./
+RUN npm install
+
+# Copy Python requirements and create virtual environment
+COPY python-server/requirements.txt ./python-server/
+RUN python3 -m venv ./python-server/venv && \
+    ./python-server/venv/bin/pip install --upgrade pip && \
+    ./python-server/venv/bin/pip install -r ./python-server/requirements.txt
+
+# Copy all application files
+COPY . .
+
+# Build for Linux by default (can be overridden)
+ARG BUILD_TARGET=linux
+RUN npm run build-${BUILD_TARGET}
+
+# Create output stage to extract built files
+FROM alpine:latest AS output
+COPY --from=builder /app/dist /dist

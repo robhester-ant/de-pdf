@@ -1,0 +1,8 @@
+*.pdf
+*.png
+*.md
+api_key.json
+__pycache__
+*.pyc
+.git
+.gitignore

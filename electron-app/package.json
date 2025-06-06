@@ -1,0 +1,51 @@
+{
+  "name": "document-to-markdown",
+  "version": "1.0.0",
+  "description": "Convert PDFs to Markdown using Claude 4 Sonnet",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build-mac": "electron-builder --mac",
+    "build-win": "electron-builder --win",
+    "build-linux": "electron-builder --linux",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "keywords": ["pdf", "markdown", "converter", "claude", "anthropic"],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.yourcompany.document-to-markdown",
+    "productName": "Document to Markdown",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!**/*.pyc",
+      "!**/__pycache__"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png"
+    },
+    "extraResources": [
+      {
+        "from": "python-server",
+        "to": "python-server",
+        "filter": ["**/*"]
+      }
+    ]
+  }
+}

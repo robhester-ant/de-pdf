@@ -1,0 +1,49 @@
+# API Keys and secrets
+api_key.json
+*.key
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test outputs
+test_*.md
+output_*.md
+raw_extracted_*.txt
+first_*_pages_raw.txt
+converted.md
+
+# Docker
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Input files (PDFs, docs)
+*.pdf
+*.doc
+*.docx
+input.*
+
+# Personal files
+style.png

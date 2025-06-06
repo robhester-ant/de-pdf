@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document to Markdown Converter</title>
+    <!-- PDF.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- Marked.js for Markdown to HTML conversion -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        // Wait for PDF.js to load
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+    </script>
+    <style>
+        @font-face {
+            font-family: 'Departure Mono';
+            src: url('font/DepartureMono-Regular.woff2') format('woff2'),
+                 url('font/DepartureMono-Regular.woff') format('woff'),
+                 url('font/DepartureMono-Regular.otf') format('opentype');
+            font-weight: 400;
+            font-style: normal;
+        }
+        
+        body {
+            font-family: 'Departure Mono', monospace;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: white;
+            padding: 40px;
+            width: 98%;
+            max-width: 1400px;
+            height: 90vh;
+            max-height: 900px;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 20px;
+                width: 100%;
+                height: auto;
+                max-height: none;
+            }
+        }
+        h1 {
+            color: #2563eb;
+            text-align: center;
+            margin-bottom: 30px;
+            font-weight: 500;
+        }
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+            font-family: 'Departure Mono', monospace;
+        }
+        input[type="text"]:focus, input[type="password"]:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+        button {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+            transition: background-color 0.2s;
+            font-family: 'Departure Mono', monospace;
+        }
+        button:hover {
+            background-color: #1d4ed8;
+        }
+        button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        .reset-link {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #2563eb;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .reset-link:hover {
+            text-decoration: underline;
+        }
+        .upload-area {
+            border: 2px dashed #e5e7eb;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            border-color: #2563eb;
+            background-color: #f0f9ff;
+        }
+        .upload-area.drag-over {
+            border-color: #2563eb;
+            background-color: #dbeafe;
+        }
+        .file-input {
+            display: none;
+        }
+        .progress-container {
+            margin: 20px 0;
+            display: none;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #2563eb;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .status-text {
+            margin: 10px 0;
+            color: #6b7280;
+            font-size: 14px;
+            text-align: center;
+        }
+        .output-container {
+            margin-top: 20px;
+            display: none;
+        }
+        .markdown-display {
+            width: 100%;
+            height: 100%;
+            min-height: 400px;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 14px;
+            overflow-y: auto;
+            background-color: #fff;
+            box-sizing: border-box;
+            line-height: 1.6;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .markdown-display:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+        .markdown-display h1 { font-size: 2em; margin: 0.67em 0; font-weight: bold; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .markdown-display h2 { font-size: 1.5em; margin: 0.75em 0; font-weight: bold; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .markdown-display h3 { font-size: 1.17em; margin: 0.83em 0; font-weight: bold; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .markdown-display h4 { font-size: 1em; margin: 1.12em 0; font-weight: bold; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .markdown-display h5 { font-size: 0.83em; margin: 1.5em 0; font-weight: bold; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .markdown-display h6 { font-size: 0.75em; margin: 1.67em 0; font-weight: bold; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .markdown-display p { margin: 1em 0; }
+        .markdown-display blockquote { 
+            margin: 1em 0; 
+            padding-left: 1em; 
+            border-left: 4px solid #e5e7eb; 
+            color: #6b7280; 
+        }
+        .markdown-display code {
+            background-color: #f3f4f6;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+        .markdown-display pre {
+            background-color: #f3f4f6;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        .markdown-display pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        .markdown-display ul, .markdown-display ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        .markdown-display li {
+            margin: 0.5em 0;
+        }
+        .markdown-display a {
+            color: #2563eb;
+            text-decoration: underline;
+        }
+        .markdown-display hr {
+            border: none;
+            border-top: 1px solid #e5e7eb;
+            margin: 2em 0;
+        }
+        .markdown-display table {
+            border-collapse: collapse;
+            margin: 1em 0;
+        }
+        .markdown-display th, .markdown-display td {
+            border: 1px solid #e5e7eb;
+            padding: 8px;
+        }
+        .markdown-display th {
+            background-color: #f3f4f6;
+            font-weight: bold;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .button-group button {
+            flex: 1;
+            margin-top: 0;
+        }
+        .success-message {
+            color: #059669;
+            text-align: center;
+            margin-top: 20px;
+            display: none;
+        }
+        .error-message {
+            color: #dc2626;
+            text-align: center;
+            margin-top: 20px;
+            display: none;
+        }
+        .warning-box {
+            background-color: #fef3c7;
+            border: 1px solid #f59e0b;
+            padding: 12px;
+            margin: 20px 0;
+            font-size: 14px;
+            color: #92400e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="api-key-section">
+            <h1>Document to Markdown Converter</h1>
+            <p style="text-align: center; color: #6b7280; margin-bottom: 30px;">
+                Convert PDFs to Markdown using Claude 4 Sonnet
+            </p>
+            <input type="password" id="api-key" placeholder="Enter your Claude API key" autocomplete="off">
+            <button onclick="saveApiKey()">Save API Key</button>
+            <div class="warning-box">
+                <strong>Privacy Note:</strong> Your API key is stored locally in your browser. When connecting to Claude, this tool will try a direct connection first, then fall back to a CORS proxy if needed. For maximum privacy, consider using a CORS browser extension instead.
+            </div>
+        </div>
+        
+        <div id="upload-section" style="display: none; height: 100%; display: flex; flex-direction: column;">
+            <a href="#" class="reset-link" onclick="resetApiKey()">Reset Key</a>
+            <h1 style="margin-top: 0; font-family: 'Departure Mono', monospace;">De-PDF</h1>
+            <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+                <p style="margin: 0; color: #6b7280;">Drop your PDF here or click to browse</p>
+                <p style="margin: 10px 0 0 0; color: #9ca3af; font-size: 14px;">PDF files only (HTML/DOCX support coming soon)</p>
+                <input type="file" id="file-input" class="file-input" accept=".pdf" onchange="handleFileSelect(event)">
+            </div>
+            
+            <div class="progress-container" id="progress-container">
+                <div class="status-text" id="status-text">Initializing...</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+            </div>
+            
+            <div class="output-container" id="output-container" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                <h3 style="margin-bottom: 10px;">Converted Markdown:</h3>
+                <div id="markdown-output" class="markdown-display" contenteditable="false" style="flex: 1; min-height: 0;"></div>
+                <div class="button-group">
+                    <button onclick="downloadMarkdown()">Download .md</button>
+                    <button onclick="copyPlaintext()">Copy Plaintext</button>
+                    <button onclick="copyMarkdown()">Copy Markdown</button>
+                    <button onclick="copyRichText()">Copy Rich Text</button>
+                </div>
+                <div class="success-message" id="success-message">Copied to clipboard!</div>
+            </div>
+            
+            <div class="error-message" id="error-message"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let apiKey = '';
+        let convertedMarkdown = '';
+
+        // Check for saved API key on load
+        window.onload = function() {
+            // Initialize PDF.js
+            if (typeof pdfjsLib !== 'undefined') {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            } else {
+                console.error('PDF.js failed to load');
+            }
+
+            const savedKey = localStorage.getItem('claude-api-key');
+            if (savedKey) {
+                apiKey = savedKey;
+                showUploadSection();
+            }
+        };
+
+        function saveApiKey() {
+            const key = document.getElementById('api-key').value;
+            if (!key) {
+                alert('Please enter an API key');
+                return;
+            }
+            apiKey = key;
+            localStorage.setItem('claude-api-key', key);
+            showUploadSection();
+        }
+
+        function showUploadSection() {
+            document.getElementById('api-key-section').style.display = 'none';
+            document.getElementById('upload-section').style.display = 'block';
+        }
+
+        function resetApiKey() {
+            if (confirm('Are you sure you want to reset your API key?')) {
+                localStorage.removeItem('claude-api-key');
+                apiKey = '';
+                location.reload();
+            }
+        }
+
+        // Drag and drop functionality
+        const uploadArea = document.getElementById('upload-area');
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        async function handleFile(file) {
+            if (!file.name.toLowerCase().endsWith('.pdf')) {
+                showError('Please upload a PDF file');
+                return;
+            }
+
+            // Reset UI
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('output-container').style.display = 'none';
+            document.getElementById('progress-container').style.display = 'block';
+            document.getElementById('markdown-output').innerHTML = ''; // Clear previous content
+            convertedMarkdown = ''; // Reset the stored markdown
+            updateProgress(10, 'Reading PDF file...');
+
+            try {
+                // Extract text from PDF
+                const text = await extractTextFromPDF(file);
+                
+                if (!text || text.trim().length === 0) {
+                    throw new Error('Could not extract text from PDF');
+                }
+
+                updateProgress(30, `Extracted ${text.length} characters. Cleaning up...`);
+
+                // Convert to markdown using Claude
+                const markdown = await convertToMarkdown(text);
+                
+                // Success!
+                convertedMarkdown = markdown;
+                
+                // Convert markdown to HTML and display as rich text
+                const html = marked.parse(markdown);
+                document.getElementById('markdown-output').innerHTML = html;
+                
+                document.getElementById('progress-container').style.display = 'none';
+                document.getElementById('output-container').style.display = 'block';
+
+            } catch (error) {
+                showError(error.message);
+                document.getElementById('progress-container').style.display = 'none';
+            }
+        }
+
+        async function extractTextFromPDF(file) {
+            try {
+                // Check if PDF.js is loaded
+                if (typeof pdfjsLib === 'undefined') {
+                    throw new Error('PDF.js library not loaded. Please refresh the page.');
+                }
+
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                let fullText = '';
+
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    updateProgress(10 + (20 * i / pdf.numPages), `Extracting page ${i} of ${pdf.numPages}...`);
+                    
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    fullText += pageText + '\n\n';
+                }
+
+                return fullText;
+            } catch (error) {
+                throw new Error('Failed to read PDF: ' + error.message);
+            }
+        }
+
+        async function convertToMarkdown(text) {
+            // Truncate if too long
+            const maxChars = 100000;
+            if (text.length > maxChars) {
+                text = text.substring(0, maxChars) + '\n\n[Article continues but was truncated due to length...]';
+            }
+
+            const messages = [{
+                role: 'user',
+                content: `Convert the following article text to Markdown format.
+
+IMPORTANT: This is a FORMAT CONVERSION, not a summary. Include EVERY sentence.
+
+CRITICAL INSTRUCTIONS:
+1. Fix OCR errors (e.g., "technolo y" -> "technology", "LLiisstteenn" -> "Listen")
+2. Use proper Markdown formatting (# for main title, ## for sections, etc.)
+3. Include ALL paragraphs and sentences - do not skip anything
+4. Remove only obvious website UI elements (like "https://www.bloomberg.com/..." URLs)
+5. Keep author names, dates, and all article content
+6. DO NOT stop early or say "Content continues" - include the ENTIRE article
+7. DO NOT be lazy - convert the COMPLETE text provided
+8. If the text is long, that's fine - use all available tokens
+
+Article text:
+
+${text}`
+            }];
+
+            try {
+                updateProgress(50, 'Calling Claude API...');
+                
+                // Try direct API call first
+                let response;
+                try {
+                    response = await fetch('https://api.anthropic.com/v1/messages', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-api-key': apiKey,
+                            'anthropic-version': '2023-06-01',
+                            'anthropic-dangerous-direct-browser-access': 'true'
+                        },
+                        body: JSON.stringify({
+                            model: 'claude-sonnet-4-20250514',
+                            max_tokens: 8192,
+                            temperature: 0,
+                            messages: messages
+                        })
+                    });
+                } catch (e) {
+                    // If direct call fails, try with CORS proxy
+                    updateProgress(60, 'Direct API call failed, trying with CORS proxy...');
+                    
+                    // Using public CORS proxy (allorigins)
+                    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://api.anthropic.com/v1/messages');
+                    
+                    response = await fetch(proxyUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-api-key': apiKey,
+                            'anthropic-version': '2023-06-01'
+                        },
+                        body: JSON.stringify({
+                            model: 'claude-sonnet-4-20250514',
+                            max_tokens: 8192,
+                            temperature: 0,
+                            messages: messages
+                        })
+                    });
+                }
+
+                if (!response.ok) {
+                    let errorMsg = 'API request failed';
+                    try {
+                        const error = await response.json();
+                        errorMsg = error.error?.message || errorMsg;
+                    } catch (e) {
+                        errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+                    }
+                    throw new Error(errorMsg);
+                }
+
+                updateProgress(90, 'Processing response...');
+                
+                const data = await response.json();
+                return data.content[0].text;
+
+            } catch (error) {
+                // If all else fails, provide helpful error message
+                if (error.message.includes('Failed to fetch') || error.message.includes('CORS')) {
+                    throw new Error(`API connection failed. Please try one of these solutions:
+                    
+1. Install a CORS browser extension (search for "CORS Unblock")
+2. Use a different CORS proxy by modifying the code
+3. Run this file from a local server
+
+Original error: ${error.message}`);
+                }
+                throw error;
+            }
+        }
+
+        function updateProgress(percent, status) {
+            document.getElementById('progress-fill').style.width = percent + '%';
+            document.getElementById('status-text').textContent = status;
+        }
+
+        function showError(message) {
+            document.getElementById('error-message').textContent = message;
+            document.getElementById('error-message').style.display = 'block';
+        }
+
+        function downloadMarkdown() {
+            const blob = new Blob([convertedMarkdown], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'converted-document.md';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function copyPlaintext() {
+            // Extract plain text from the rich text display
+            const plaintext = document.getElementById('markdown-output').innerText;
+            navigator.clipboard.writeText(plaintext).then(() => {
+                showSuccessMessage('Plaintext copied to clipboard!');
+            }).catch(err => {
+                showError('Failed to copy: ' + err.message);
+            });
+        }
+
+        function copyMarkdown() {
+            navigator.clipboard.writeText(convertedMarkdown).then(() => {
+                showSuccessMessage('Markdown copied to clipboard!');
+            }).catch(err => {
+                showError('Failed to copy: ' + err.message);
+            });
+        }
+
+        async function copyRichText() {
+            try {
+                let html = document.getElementById('markdown-output').innerHTML;
+                const plaintext = document.getElementById('markdown-output').innerText;
+                
+                // Convert HTML to be more Slack-compatible
+                // Replace strong tags with b tags for better Slack compatibility
+                html = html.replace(/<strong>/g, '<b>').replace(/<\/strong>/g, '</b>');
+                
+                // Ensure paragraphs have proper spacing
+                html = html.replace(/<p>/g, '<p style="margin: 0 0 1em 0;">').replace(/<\/p>/g, '</p>');
+                
+                // Add line breaks BEFORE headers for Slack (not after)
+                html = html.replace(/(<h[1-6]>)/g, '<br>$1');
+                
+                // Ensure list items have proper spacing
+                html = html.replace(/<li>/g, '<li style="margin: 0.25em 0;">');
+                
+                // Also ensure double line break between paragraphs for Slack
+                html = html.replace(/<\/p>\s*<p/g, '</p><br><p');
+                
+                // Create a more complete HTML document for better compatibility
+                const fullHtml = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; }
+b { font-weight: bold; }
+i, em { font-style: italic; }
+p { margin: 0 0 1em 0; }
+h1, h2, h3, h4, h5, h6 { font-weight: bold; margin: 0.5em 0; }
+ul, ol { margin: 0.5em 0; padding-left: 1.5em; }
+li { margin: 0.25em 0; }
+code { background-color: #f4f4f4; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+pre { background-color: #f4f4f4; padding: 8px; border-radius: 4px; overflow-x: auto; margin: 1em 0; }
+blockquote { border-left: 4px solid #ddd; margin: 0.5em 0; padding-left: 1em; color: #666; }
+</style>
+</head>
+<body>${html}</body>
+</html>`;
+                
+                // Try to write both HTML and plain text for maximum compatibility
+                const htmlBlob = new Blob([fullHtml], { type: 'text/html' });
+                const textBlob = new Blob([plaintext], { type: 'text/plain' });
+                
+                const clipboardItem = new ClipboardItem({
+                    'text/html': htmlBlob,
+                    'text/plain': textBlob
+                });
+                
+                await navigator.clipboard.write([clipboardItem]);
+                showSuccessMessage('Rich text copied to clipboard!');
+            } catch (err) {
+                // Fallback to plain text if rich text fails
+                navigator.clipboard.writeText(document.getElementById('markdown-output').innerText).then(() => {
+                    showSuccessMessage('Copied as plain text (rich text not supported)');
+                }).catch(err2 => {
+                    showError('Failed to copy: ' + err2.message);
+                });
+            }
+        }
+
+        function showSuccessMessage(message) {
+            document.getElementById('success-message').textContent = message;
+            document.getElementById('success-message').style.display = 'block';
+            setTimeout(() => {
+                document.getElementById('success-message').style.display = 'none';
+                document.getElementById('success-message').textContent = 'Copied to clipboard!';
+            }, 2000);
+        }
+
+    </script>
+</body>
+</html>

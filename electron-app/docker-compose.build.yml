@@ -1,0 +1,10 @@
+services:
+  builder:
+    build:
+      context: .
+      dockerfile: Dockerfile.build
+      args:
+        BUILD_TARGET: ${BUILD_TARGET:-linux}
+    volumes:
+      - ./dist:/output
+    command: sh -c "cp -r /dist/* /output/ && echo 'Build complete! Check the dist folder.'"
