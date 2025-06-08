@@ -279,8 +279,16 @@
             <h1 style="margin-top: 0; font-family: 'Departure Mono', monospace;">De-PDF</h1>
             <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
                 <p style="margin: 0; color: #6b7280;">Drop your PDF here or click to browse</p>
-                <p style="margin: 10px 0 0 0; color: #9ca3af; font-size: 14px;">PDF files only (HTML/DOCX support coming soon)</p>
+                <p style="margin: 10px 0 0 0; color: #9ca3af; font-size: 14px;">PDF files only</p>
                 <input type="file" id="file-input" class="file-input" accept=".pdf" onchange="handleFileSelect(event)">
+            </div>
+            
+            <div style="margin: 20px 0; text-align: center;">
+                <p style="margin: 0 0 10px 0; color: #6b7280;">Or convert from a URL:</p>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="url-input" placeholder="https://example.com/article" style="flex: 1;">
+                    <button onclick="handleURL()" style="width: auto; margin: 0; padding: 12px 24px;">Convert URL</button>
+                </div>
             </div>
             
             <div class="progress-container" id="progress-container">
@@ -402,6 +410,195 @@
                 }
 
                 updateProgress(30, `Extracted ${text.length} characters. Cleaning up...`);
+
+                // Convert to markdown using Claude
+                const markdown = await convertToMarkdown(text);
+                
+                // Success!
+                convertedMarkdown = markdown;
+                
+                // Convert markdown to HTML and display as rich text
+                const html = marked.parse(markdown);
+                document.getElementById('markdown-output').innerHTML = html;
+                
+                document.getElementById('progress-container').style.display = 'none';
+                document.getElementById('output-container').style.display = 'block';
+
+            } catch (error) {
+                showError(error.message);
+                document.getElementById('progress-container').style.display = 'none';
+            }
+        }
+
+        // Enhanced URL handling configuration
+        const URL_ENHANCER = {
+            userAgents: {
+                chrome: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                safari: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2.1 Safari/605.1.15',
+                firefox: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0'
+            },
+            domainConfig: {
+                'anthropic.com': { headers: { 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' } },
+                'bloomberg.com': { delay: 2000 },
+                'nytimes.com': { delay: 1500 }
+            },
+            getHeaders: function(url) {
+                const domain = new URL(url).hostname.toLowerCase();
+                const config = Object.keys(this.domainConfig).find(key => domain.includes(key));
+                return {
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    ...(config ? this.domainConfig[config].headers || {} : {})
+                };
+            },
+            getDelay: function(url) {
+                const domain = new URL(url).hostname.toLowerCase();
+                const config = Object.keys(this.domainConfig).find(key => domain.includes(key));
+                return config && this.domainConfig[config].delay || 0;
+            }
+        };
+
+        async function handleURL() {
+            const urlInput = document.getElementById('url-input').value.trim();
+            
+            if (!urlInput) {
+                showError('Please enter a URL');
+                return;
+            }
+
+            // Basic URL validation
+            try {
+                new URL(urlInput);
+            } catch (e) {
+                showError('Please enter a valid URL');
+                return;
+            }
+
+            // Reset UI
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('output-container').style.display = 'none';
+            document.getElementById('progress-container').style.display = 'block';
+            document.getElementById('markdown-output').innerHTML = ''; // Clear previous content
+            convertedMarkdown = ''; // Reset the stored markdown
+            updateProgress(10, 'Fetching web page with enhanced headers...');
+
+            try {
+                // Enhanced fetch with retry logic
+                let htmlContent;
+                let attempts = 0;
+                const maxAttempts = 3;
+                
+                while (attempts < maxAttempts) {
+                    try {
+                        // First try direct fetch with enhanced headers
+                        const headers = URL_ENHANCER.getHeaders(urlInput);
+                        const response = await fetch(urlInput, { headers });
+                        if (!response.ok) throw new Error('Failed to fetch');
+                        htmlContent = await response.text();
+                        
+                        // Apply domain-specific delay
+                        const delay = URL_ENHANCER.getDelay(urlInput);
+                        if (delay > 0) {
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                        }
+                        break;
+                    } catch (e) {
+                        attempts++;
+                        if (attempts >= maxAttempts) {
+                            // If direct fetch fails due to CORS, try with a proxy
+                            updateProgress(20, 'Direct fetch failed, trying with proxy...');
+                            const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(urlInput);
+                            const proxyResponse = await fetch(proxyUrl);
+                            if (!proxyResponse.ok) {
+                                throw new Error('Failed to fetch URL. The website may be blocking access. Level 3 integration may be required for this site.');
+                            }
+                            htmlContent = await proxyResponse.text();
+                        } else {
+                            // Exponential backoff
+                            const waitTime = Math.pow(2, attempts - 1) * 1000;
+                            updateProgress(15, `Attempt ${attempts} failed, retrying in ${waitTime/1000}s...`);
+                            await new Promise(resolve => setTimeout(resolve, waitTime));
+                        }
+                    }
+                }
+
+                updateProgress(30, 'Extracting text from web page...');
+
+                // Check for JavaScript requirements
+                if (htmlContent.toLowerCase().includes('please enable javascript') || 
+                    htmlContent.includes('__NEXT_DATA__') || 
+                    htmlContent.includes('window.React')) {
+                    console.warn('JavaScript-rendered content detected. Level 3 integration recommended for better results.');
+                }
+
+                // Enhanced text extraction
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlContent, 'text/html');
+                
+                // Remove non-content elements
+                const removeElements = doc.querySelectorAll('script, style, noscript, header, footer, nav, aside, form, iframe, object, embed');
+                removeElements.forEach(el => el.remove());
+                
+                // Extract metadata
+                let title = doc.querySelector('title')?.textContent?.trim();
+                let author = doc.querySelector('meta[name="author"]')?.content || 
+                            doc.querySelector('meta[property="article:author"]')?.content;
+                
+                // Enhanced content selectors
+                const contentSelectors = [
+                    'article',
+                    'main',
+                    '[role="main"]',
+                    '.article-content',
+                    '.post-content',
+                    '.entry-content',
+                    '.content',
+                    '#content',
+                    '.story-body',
+                    '.article-body',
+                    '[itemprop="articleBody"]',
+                    '.post',
+                    '.entry'
+                ];
+                
+                let contentElement = null;
+                for (const selector of contentSelectors) {
+                    contentElement = doc.querySelector(selector);
+                    if (contentElement) break;
+                }
+                
+                // If no main content found, try to identify by text density
+                if (!contentElement) {
+                    let maxTextLength = 0;
+                    doc.querySelectorAll('div, section, article').forEach(element => {
+                        const textLength = element.textContent.trim().length;
+                        if (textLength > maxTextLength) {
+                            maxTextLength = textLength;
+                            contentElement = element;
+                        }
+                    });
+                }
+                
+                if (!contentElement) {
+                    contentElement = doc.body;
+                }
+                
+                // Extract text
+                let text = contentElement.innerText || contentElement.textContent || '';
+                
+                // Add metadata if available
+                if (title || author) {
+                    let metadata = '';
+                    if (title) metadata += `Title: ${title}\n`;
+                    if (author) metadata += `Author: ${author}\n`;
+                    text = metadata + '\n' + text;
+                }
+                
+                if (!text || text.trim().length === 0) {
+                    throw new Error('Could not extract text from the web page. The site may require JavaScript rendering (Level 3).');
+                }
+
+                updateProgress(50, `Extracted ${text.length} characters. Converting to markdown...`);
 
                 // Convert to markdown using Claude
                 const markdown = await convertToMarkdown(text);

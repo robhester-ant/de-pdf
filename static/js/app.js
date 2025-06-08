@@ -1,20 +1,22 @@
 // Global variables
 let convertedMarkdown = '';
 let eventSource = null;
-let accumulatedMarkdown = ''; // Track markdown as it streams in
+let accumulatedMarkdown = '';
 
 // Check for saved API key on load
 window.onload = async function() {
-    const result = await window.electronAPI.getApiKey();
-    if (result.hasKey) {
-        // Pass API key to backend
-        await fetch('http://localhost:3333/restore-api-key', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({key: result.apiKey})
-        });
-        showUploadSection();
+    try {
+        const response = await fetch('/check-api-key');
+        const result = await response.json();
+        if (result.hasKey) {
+            showUploadSection();
+        }
+    } catch (error) {
+        console.error('Error checking API key:', error);
     }
+    
+    // Set up drag and drop after DOM is loaded
+    setupDragAndDrop();
 };
 
 async function saveApiKey() {
@@ -24,52 +26,60 @@ async function saveApiKey() {
         return;
     }
     
-    // Save to Electron's storage
-    const result = await window.electronAPI.saveApiKey(key);
-    if (result.success) {
-        // Send to Python backend
-        await fetch('http://localhost:3333/save-api-key', {
+    try {
+        const response = await fetch('/save-api-key', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({key: key})
         });
-        showUploadSection();
+        
+        const result = await response.json();
+        if (result.success) {
+            showUploadSection();
+        }
+    } catch (error) {
+        showError('Failed to save API key: ' + error.message);
     }
 }
 
 function showUploadSection() {
     document.getElementById('api-key-section').style.display = 'none';
-    document.getElementById('upload-section').style.display = 'block';
+    document.getElementById('upload-section').style.display = 'flex';
 }
 
 async function resetApiKey() {
     if (confirm('Are you sure you want to reset your API key?')) {
-        await window.electronAPI.resetApiKey();
-        await fetch('http://localhost:3333/reset-api-key', {method: 'POST'});
-        location.reload();
+        try {
+            await fetch('/reset-api-key', {method: 'POST'});
+            location.reload();
+        } catch (error) {
+            showError('Failed to reset API key: ' + error.message);
+        }
     }
 }
 
-// Drag and drop functionality
-const uploadArea = document.getElementById('upload-area');
+// Set up drag and drop functionality
+function setupDragAndDrop() {
+    const uploadArea = document.getElementById('upload-area');
+    
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('drag-over');
+    });
 
-uploadArea.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    uploadArea.classList.add('drag-over');
-});
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('drag-over');
+    });
 
-uploadArea.addEventListener('dragleave', () => {
-    uploadArea.classList.remove('drag-over');
-});
-
-uploadArea.addEventListener('drop', (e) => {
-    e.preventDefault();
-    uploadArea.classList.remove('drag-over');
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-        handleFile(files[0]);
-    }
-});
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFile(files[0]);
+        }
+    });
+}
 
 function handleFileSelect(event) {
     const file = event.target.files[0];
@@ -85,67 +95,71 @@ async function handleFile(file) {
     document.getElementById('progress-container').style.display = 'block';
     document.getElementById('markdown-output').innerHTML = '';
     accumulatedMarkdown = '';
-    convertedMarkdown = ''; // Reset the stored markdown
+    convertedMarkdown = '';
     document.getElementById('progress-fill').style.width = '20%';
     document.getElementById('status-text').textContent = 'Uploading file...';
     
-    // Close any existing EventSource
-    if (eventSource) {
-        eventSource.close();
-    }
-
     try {
         const formData = new FormData();
         formData.append('file', file);
 
-        // Upload and convert with streaming
-        eventSource = new EventSource('http://localhost:3333/convert-stream');
-        
-        eventSource.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            
-            if (data.chunk) {
-                accumulatedMarkdown += data.chunk;
-                convertedMarkdown = accumulatedMarkdown;
-                
-                // Convert markdown to HTML and display as rich text
-                const html = marked.parse(accumulatedMarkdown);
-                document.getElementById('markdown-output').innerHTML = html;
-                
-                document.getElementById('output-container').style.display = 'block';
-                document.getElementById('status-text').textContent = 'Cleaning up...';
-                
-                // Auto-scroll
-                const markdownDisplay = document.getElementById('markdown-output');
-                markdownDisplay.scrollTop = markdownDisplay.scrollHeight;
-            } else if (data.done) {
-                document.getElementById('progress-container').style.display = 'none';
-                convertedMarkdown = accumulatedMarkdown;
-                eventSource.close();
-            } else if (data.error) {
-                showError(data.error);
-                eventSource.close();
-            }
-        };
-
-        eventSource.onerror = (error) => {
-            console.error('EventSource error:', error);
-            showError('Connection lost. Please try again.');
-            eventSource.close();
-        };
-
-        // Start the conversion
-        const response = await fetch('http://localhost:3333/convert-stream', {
+        // Upload file and process with streaming response
+        const response = await fetch('/convert-stream', {
             method: 'POST',
             body: formData
         });
 
-        if (!response.ok) {
-            throw new Error('Upload failed');
+        document.getElementById('progress-fill').style.width = '50%';
+        document.getElementById('status-text').textContent = 'Converting to markdown...';
+
+        // Read the streaming response
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            
+            buffer += decoder.decode(value, {stream: true});
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // Keep incomplete line in buffer
+            
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+                        
+                        if (data.chunk) {
+                            accumulatedMarkdown += data.chunk;
+                            convertedMarkdown = accumulatedMarkdown;
+                            
+                            // Convert markdown to HTML and display
+                            const html = marked.parse(accumulatedMarkdown);
+                            document.getElementById('markdown-output').innerHTML = html;
+                            
+                            document.getElementById('output-container').style.display = 'block';
+                            document.getElementById('status-text').textContent = 'Converting...';
+                            
+                            // Auto-scroll
+                            const markdownDisplay = document.getElementById('markdown-output');
+                            markdownDisplay.scrollTop = markdownDisplay.scrollHeight;
+                        } else if (data.done) {
+                            document.getElementById('progress-container').style.display = 'none';
+                            convertedMarkdown = accumulatedMarkdown;
+                        } else if (data.error) {
+                            showError(data.error);
+                            break;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing SSE data:', e);
+                    }
+                }
+            }
         }
 
     } catch (error) {
-        showError(error.message);
+        showError('Error processing file: ' + error.message);
     }
 }
 
@@ -171,7 +185,7 @@ async function handleURL() {
     document.getElementById('progress-container').style.display = 'block';
     document.getElementById('markdown-output').innerHTML = '';
     accumulatedMarkdown = '';
-    convertedMarkdown = ''; // Reset the stored markdown
+    convertedMarkdown = '';
     document.getElementById('progress-fill').style.width = '20%';
     document.getElementById('status-text').textContent = 'Fetching URL...';
     
@@ -181,8 +195,8 @@ async function handleURL() {
     }
 
     try {
-        // Send URL to backend
-        eventSource = new EventSource('http://localhost:3333/convert-url-stream?url=' + encodeURIComponent(urlInput));
+        // Send URL to backend with EventSource for streaming
+        eventSource = new EventSource('/convert-url-stream?url=' + encodeURIComponent(urlInput));
         
         eventSource.onmessage = (event) => {
             const data = JSON.parse(event.data);
@@ -196,7 +210,8 @@ async function handleURL() {
                 document.getElementById('markdown-output').innerHTML = html;
                 
                 document.getElementById('output-container').style.display = 'block';
-                document.getElementById('status-text').textContent = 'Cleaning up...';
+                document.getElementById('progress-fill').style.width = '70%';
+                document.getElementById('status-text').textContent = 'Converting...';
                 
                 // Auto-scroll
                 const markdownDisplay = document.getElementById('markdown-output');
@@ -213,7 +228,7 @@ async function handleURL() {
 
         eventSource.onerror = (error) => {
             console.error('EventSource error:', error);
-            showError('Connection lost. Please try again.');
+            showError('Failed to process URL. Please check if the site is accessible.');
             eventSource.close();
         };
 
@@ -239,7 +254,6 @@ function downloadMarkdown() {
 }
 
 function copyPlaintext() {
-    // Extract plain text from the rich text display
     const plaintext = document.getElementById('markdown-output').innerText;
     navigator.clipboard.writeText(plaintext).then(() => {
         showSuccessMessage('Plaintext copied to clipboard!');
@@ -262,22 +276,13 @@ async function copyRichText() {
         const plaintext = document.getElementById('markdown-output').innerText;
         
         // Convert HTML to be more Slack-compatible
-        // Replace strong tags with b tags for better Slack compatibility
         html = html.replace(/<strong>/g, '<b>').replace(/<\/strong>/g, '</b>');
-        
-        // Ensure paragraphs have proper spacing
         html = html.replace(/<p>/g, '<p style="margin: 0 0 1em 0;">').replace(/<\/p>/g, '</p>');
-        
-        // Add line breaks BEFORE headers for Slack (not after)
         html = html.replace(/(<h[1-6]>)/g, '<br>$1');
-        
-        // Ensure list items have proper spacing
         html = html.replace(/<li>/g, '<li style="margin: 0.25em 0;">');
-        
-        // Also ensure double line break between paragraphs for Slack
         html = html.replace(/<\/p>\s*<p/g, '</p><br><p');
         
-        // Create a more complete HTML document for better compatibility
+        // Create a complete HTML document
         const fullHtml = `<!DOCTYPE html>
 <html>
 <head>
@@ -298,7 +303,7 @@ blockquote { border-left: 4px solid #ddd; margin: 0.5em 0; padding-left: 1em; co
 <body>${html}</body>
 </html>`;
         
-        // Try to write both HTML and plain text for maximum compatibility
+        // Write both HTML and plain text for compatibility
         const htmlBlob = new Blob([fullHtml], { type: 'text/html' });
         const textBlob = new Blob([plaintext], { type: 'text/plain' });
         
@@ -310,7 +315,7 @@ blockquote { border-left: 4px solid #ddd; margin: 0.5em 0; padding-left: 1em; co
         await navigator.clipboard.write([clipboardItem]);
         showSuccessMessage('Rich text copied to clipboard!');
     } catch (err) {
-        // Fallback to plain text if rich text fails
+        // Fallback to plain text
         navigator.clipboard.writeText(document.getElementById('markdown-output').innerText).then(() => {
             showSuccessMessage('Copied as plain text (rich text not supported)');
         }).catch(err2 => {

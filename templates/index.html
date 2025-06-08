@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document to Markdown Converter</title>
+    <!-- Marked.js for Markdown to HTML conversion -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div id="api-key-section">
+            <h1>Document to Markdown Converter</h1>
+            <p style="text-align: center; color: #6b7280; margin-bottom: 30px;">
+                Convert PDFs, HTML, and DOCX files to Markdown using Claude 4 Sonnet
+            </p>
+            <input type="password" id="api-key" placeholder="Enter your Claude API key" autocomplete="off">
+            <button onclick="saveApiKey()">Save API Key</button>
+        </div>
+        
+        <div id="upload-section" style="display: none; height: 100%; display: flex; flex-direction: column;">
+            <a class="reset-link" onclick="resetApiKey()">Reset Key</a>
+            <h1 style="margin-top: 0; font-family: 'Departure Mono', monospace;">De-PDF</h1>
+            <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+                <p style="margin: 0; color: #6b7280;">Drop your file here or click to browse</p>
+                <p style="margin: 10px 0 0 0; color: #9ca3af; font-size: 14px;">Supports PDF, HTML, and DOCX files</p>
+                <input type="file" id="file-input" class="file-input" accept=".pdf,.html,.htm,.doc,.docx" onchange="handleFileSelect(event)">
+            </div>
+            
+            <div style="margin: 20px 0; text-align: center;">
+                <p style="margin: 0 0 10px 0; color: #6b7280;">Or convert from a URL:</p>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="url-input" placeholder="https://example.com/article" style="flex: 1;">
+                    <button onclick="handleURL()" style="width: auto; margin: 0; padding: 12px 24px;">Convert URL</button>
+                </div>
+            </div>
+            
+            <div class="progress-container" id="progress-container">
+                <div class="status-text" id="status-text">Initializing...</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+            </div>
+            
+            <div class="output-container" id="output-container" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                <h3 style="margin-bottom: 10px;">Converted Markdown:</h3>
+                <div id="markdown-output" class="markdown-display" contenteditable="false" style="flex: 1; min-height: 0;"></div>
+                <div class="button-group">
+                    <button onclick="downloadMarkdown()">Download .md</button>
+                    <button onclick="copyPlaintext()">Copy Plaintext</button>
+                    <button onclick="copyMarkdown()">Copy Markdown</button>
+                    <button onclick="copyRichText()">Copy Rich Text</button>
+                </div>
+                <div class="success-message" id="success-message">Copied to clipboard!</div>
+            </div>
+            
+            <div class="error-message" id="error-message"></div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

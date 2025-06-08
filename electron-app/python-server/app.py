@@ -7,6 +7,8 @@ import os
 import json
 import io
 import sys
+import requests
+from url_enhancer import URLEnhancer
 
 app = Flask(__name__)
 
@@ -119,6 +121,148 @@ def convert_stream():
             text = text[:100000] + "\n\n[Article continues but was truncated due to length...]"
             print("Text truncated to 100000 characters", flush=True)
         
+    except Exception as e:
+        import traceback
+        print(f"Error processing request: {str(e)}", flush=True)
+        print(f"Traceback: {traceback.format_exc()}", flush=True)
+        return Response(
+            f"data: {json.dumps({'error': str(e)})}\n\n",
+            mimetype='text/event-stream'
+        )
+    
+    # Generator function with all data captured
+    def generate():
+        try:
+            # Convert to markdown using Claude with streaming
+            client = anthropic.Anthropic(api_key=api_key)
+            
+            print("Starting Claude 3.5 Sonnet streaming response...", flush=True)
+            
+            stream = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=8192,  # Claude 4 supports up to 64K output tokens
+                temperature=0,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"""Convert the following article text to Markdown format.
+
+IMPORTANT: This is a FORMAT CONVERSION, not a summary. Include EVERY sentence.
+
+CRITICAL INSTRUCTIONS:
+1. Fix OCR errors (e.g., "technolo y" -> "technology", "LLiisstteenn" -> "Listen")
+2. Use proper Markdown formatting (# for main title, ## for sections, etc.)
+3. Include ALL paragraphs and sentences - do not skip anything
+4. Remove only obvious website UI elements (like "https://www.bloomberg.com/..." URLs)
+5. Keep author names, dates, and all article content
+6. DO NOT stop early or say "Content continues" - include the ENTIRE article
+7. DO NOT be lazy - convert the COMPLETE text provided
+8. If the text is long, that's fine - use all 8192 tokens if needed
+
+Article text:
+
+{text}"""
+                    }
+                ],
+                stream=True
+            )
+            
+            chunk_count = 0
+            total_text = ""
+            for event in stream:
+                if event.type == "content_block_delta":
+                    chunk_count += 1
+                    text_chunk = event.delta.text
+                    total_text += text_chunk
+                    yield f"data: {json.dumps({'chunk': text_chunk})}\n\n"
+                    if chunk_count % 50 == 0:
+                        print(f"  Streamed {chunk_count} chunks, {len(total_text)} chars...", flush=True)
+            
+            print(f"Streaming complete: {chunk_count} chunks, {len(total_text)} chars", flush=True)
+            yield f"data: {json.dumps({'done': True})}\n\n"
+                    
+        except Exception as e:
+            import traceback
+            print(f"Error in streaming: {str(e)}", flush=True)
+            print(f"Traceback: {traceback.format_exc()}", flush=True)
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+    
+    return Response(generate(), mimetype='text/event-stream')
+
+@app.route('/convert-url-stream')
+def convert_url_stream():
+    """Stream the conversion response for a URL"""
+    # Get URL from query parameter
+    url = request.args.get('url')
+    if not url:
+        return Response(
+            f"data: {json.dumps({'error': 'No URL provided'})}\n\n",
+            mimetype='text/event-stream'
+        )
+    
+    try:
+        # Get API key
+        if not os.path.exists(API_KEY_FILE):
+            return Response(
+                f"data: {json.dumps({'error': 'API key not configured'})}\n\n",
+                mimetype='text/event-stream'
+            )
+        
+        with open(API_KEY_FILE, 'r') as f:
+            api_key = json.load(f)['key']
+        
+        # Fetch URL content with enhanced headers and retry logic
+        print(f"Fetching content from {url} with enhanced headers...", flush=True)
+        
+        try:
+            response = URLEnhancer.fetch_with_retry(url)
+            
+            # Check if JavaScript is required
+            if URLEnhancer.is_javascript_required(response.text):
+                print("JavaScript-rendered content detected. Using basic extraction but Level 3 integration recommended.", flush=True)
+            
+            # Extract text with enhanced extraction
+            text, title, author = URLEnhancer.extract_text_enhanced(response.content, url)
+            
+            # Add metadata to the beginning of text if available
+            metadata_parts = []
+            if title:
+                metadata_parts.append(f"Title: {title}")
+            if author:
+                metadata_parts.append(f"Author: {author}")
+            if metadata_parts:
+                text = '\n'.join(metadata_parts) + '\n\n' + text
+                
+        except Exception as e:
+            # Check if it's a bot detection issue
+            if "Cloudflare" in str(e) or "CAPTCHA" in str(e) or "Level 3" in str(e):
+                return Response(
+                    f"data: {json.dumps({'error': f'{str(e)} Please try a different URL or wait for Level 3 integration.'})}\n\n",
+                    mimetype='text/event-stream'
+                )
+            raise
+        
+        if not text.strip():
+            return Response(
+                f"data: {json.dumps({'error': 'Could not extract text from URL'})}\n\n",
+                mimetype='text/event-stream'
+            )
+        
+        print(f"Extracted {len(text)} characters", flush=True)
+        
+        # Truncate if too long to prevent token limits
+        if len(text) > 100000:  # Increased limit for Claude 4
+            text = text[:100000] + "\n\n[Article continues but was truncated due to length...]"
+            print("Text truncated to 100000 characters", flush=True)
+        
+    except requests.RequestException as e:
+        import traceback
+        print(f"Error fetching URL: {str(e)}", flush=True)
+        print(f"Traceback: {traceback.format_exc()}", flush=True)
+        return Response(
+            f"data: {json.dumps({'error': f'Failed to fetch URL: {str(e)}'})}\n\n",
+            mimetype='text/event-stream'
+        )
     except Exception as e:
         import traceback
         print(f"Error processing request: {str(e)}", flush=True)

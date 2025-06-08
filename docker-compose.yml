@@ -6,6 +6,6 @@ services:
     ports:
       - "3333:3333"
     volumes:
-      - .:/app
+      - ./api_key.json:/app/api_key.json
     environment:
-      - FLASK_ENV=development
+      - FLASK_ENV=production

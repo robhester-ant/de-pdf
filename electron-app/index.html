@@ -258,6 +258,14 @@
                 <input type="file" id="file-input" class="file-input" accept=".pdf,.html,.htm,.doc,.docx" onchange="handleFileSelect(event)">
             </div>
             
+            <div style="margin: 20px 0; text-align: center;">
+                <p style="margin: 0 0 10px 0; color: #6b7280;">Or convert from a URL:</p>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="url-input" placeholder="https://example.com/article" style="flex: 1;">
+                    <button onclick="handleURL()" style="width: auto; margin: 0; padding: 12px 24px;">Convert URL</button>
+                </div>
+            </div>
+            
             <div class="progress-container" id="progress-container">
                 <div class="status-text" id="status-text">Initializing...</div>
                 <div class="progress-bar">
