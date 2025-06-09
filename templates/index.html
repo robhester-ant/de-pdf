@@ -19,19 +19,19 @@
             <button onclick="saveApiKey()">Save API Key</button>
         </div>
         
-        <div id="upload-section" style="display: none; height: 100%; display: flex; flex-direction: column;">
+        <div id="upload-section" style="display: none; flex-direction: column;">
             <a class="reset-link" onclick="resetApiKey()">Reset Key</a>
-            <h1 style="margin-top: 0; font-family: 'Departure Mono', monospace;">De-PDF</h1>
-            <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+            <h1 style="margin: 0 0 30px 0; font-family: 'Departure Mono', monospace; text-align: center;">De-PDF</h1>
+            <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()" style="margin-bottom: 30px;">
                 <p style="margin: 0; color: #6b7280;">Drop your file here or click to browse</p>
                 <p style="margin: 10px 0 0 0; color: #9ca3af; font-size: 14px;">Supports PDF, HTML, and DOCX files</p>
                 <input type="file" id="file-input" class="file-input" accept=".pdf,.html,.htm,.doc,.docx" onchange="handleFileSelect(event)">
             </div>
             
-            <div style="margin: 20px 0; text-align: center;">
+            <div id="url-input-container" style="margin: 0 auto 20px; text-align: center; width: 100%; max-width: 800px;">
                 <p style="margin: 0 0 10px 0; color: #6b7280;">Or convert from a URL:</p>
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="url-input" placeholder="https://example.com/article" style="flex: 1;">
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="text" id="url-input" placeholder="https://example.com/article" style="flex: 1; width: auto; margin: 0;">
                     <button onclick="handleURL()" style="width: auto; margin: 0; padding: 12px 24px;">Convert URL</button>
                 </div>
             </div>
@@ -43,15 +43,15 @@
                 </div>
             </div>
             
-            <div class="output-container" id="output-container" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
-                <h3 style="margin-bottom: 10px;">Converted Markdown:</h3>
-                <div id="markdown-output" class="markdown-display" contenteditable="false" style="flex: 1; min-height: 0;"></div>
-                <div class="button-group">
+            <div class="output-container" id="output-container">
+                <div class="button-group" id="action-buttons">
                     <button onclick="downloadMarkdown()">Download .md</button>
                     <button onclick="copyPlaintext()">Copy Plaintext</button>
                     <button onclick="copyMarkdown()">Copy Markdown</button>
                     <button onclick="copyRichText()">Copy Rich Text</button>
+                    <button onclick="resetUI()" style="background-color: #6b7280;">Reset</button>
                 </div>
+                <div id="markdown-output" class="markdown-display" contenteditable="false"></div>
                 <div class="success-message" id="success-message">Copied to clipboard!</div>
             </div>
             

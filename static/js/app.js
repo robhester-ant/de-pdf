@@ -89,6 +89,10 @@ function handleFileSelect(event) {
 }
 
 async function handleFile(file) {
+    // Hide input elements when processing starts
+    document.getElementById('upload-area').style.display = 'none';
+    document.getElementById('url-input-container').style.display = 'none';
+    
     // Reset UI
     document.getElementById('error-message').style.display = 'none';
     document.getElementById('output-container').style.display = 'none';
@@ -179,6 +183,10 @@ async function handleURL() {
         return;
     }
 
+    // Hide input elements when processing starts
+    document.getElementById('upload-area').style.display = 'none';
+    document.getElementById('url-input-container').style.display = 'none';
+    
     // Reset UI
     document.getElementById('error-message').style.display = 'none';
     document.getElementById('output-container').style.display = 'none';
@@ -241,6 +249,9 @@ function showError(message) {
     document.getElementById('error-message').textContent = message;
     document.getElementById('error-message').style.display = 'block';
     document.getElementById('progress-container').style.display = 'none';
+    // Show input elements again on error
+    document.getElementById('upload-area').style.display = 'block';
+    document.getElementById('url-input-container').style.display = 'block';
 }
 
 function downloadMarkdown() {
@@ -331,4 +342,25 @@ function showSuccessMessage(message) {
         document.getElementById('success-message').style.display = 'none';
         document.getElementById('success-message').textContent = 'Copied to clipboard!';
     }, 2000);
+}
+
+function resetUI() {
+    // Show input elements again
+    document.getElementById('upload-area').style.display = 'block';
+    document.getElementById('url-input-container').style.display = 'block';
+    
+    // Hide output and reset values
+    document.getElementById('output-container').style.display = 'none';
+    document.getElementById('error-message').style.display = 'none';
+    document.getElementById('markdown-output').innerHTML = '';
+    document.getElementById('url-input').value = '';
+    document.getElementById('file-input').value = '';
+    convertedMarkdown = '';
+    accumulatedMarkdown = '';
+    
+    // Close any existing EventSource
+    if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+    }
 }
