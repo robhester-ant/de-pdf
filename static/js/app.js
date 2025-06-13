@@ -10,6 +10,8 @@ window.onload = async function() {
         const result = await response.json();
         if (result.hasKey) {
             showUploadSection();
+            // Check for URL parameter after showing upload section
+            checkForURLParameter();
         }
     } catch (error) {
         console.error('Error checking API key:', error);
@@ -363,4 +365,185 @@ function resetUI() {
         eventSource.close();
         eventSource = null;
     }
+}
+
+function checkForURLParameter() {
+    // Check query parameters for URL
+    const searchParams = new URLSearchParams(window.location.search);
+    const urlParam = searchParams.get('url');
+    
+    if (urlParam) {
+        try {
+            new URL(urlParam); // Validate URL
+            document.getElementById('url-input').value = urlParam;
+            
+            // Automatically trigger conversion after a short delay
+            setTimeout(() => {
+                console.log('Auto-converting URL from query:', urlParam);
+                handleURL();
+            }, 500);
+        } catch (e) {
+            console.error('Invalid URL in query parameter:', urlParam);
+        }
+    }
+}
+
+function openReaderMode() {
+    if (!convertedMarkdown) {
+        showError('No content to display in reader mode');
+        return;
+    }
+    
+    // Create reader mode HTML
+    const readerHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reader Mode</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #fafafa;
+            color: #333;
+            font-family: Georgia, 'Times New Roman', serif;
+            line-height: 1.8;
+            font-size: 18px;
+        }
+        .reader-container {
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background-color: #fff;
+            min-height: 100vh;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+        }
+        .close-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #666;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            z-index: 1000;
+        }
+        .close-button:hover {
+            background: #555;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-weight: 600;
+            margin: 1.5em 0 0.5em 0;
+            line-height: 1.3;
+        }
+        h1 { font-size: 2.2em; }
+        h2 { font-size: 1.8em; }
+        h3 { font-size: 1.4em; }
+        p {
+            margin: 0 0 1.5em 0;
+        }
+        blockquote {
+            margin: 1.5em 0;
+            padding-left: 1em;
+            border-left: 4px solid #ddd;
+            color: #666;
+            font-style: italic;
+        }
+        code {
+            background-color: #f5f5f5;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 1em;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+        }
+        ul, ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+        li {
+            margin: 0.5em 0;
+        }
+        a {
+            color: #2563eb;
+            text-decoration: underline;
+        }
+        a:hover {
+            color: #1d4ed8;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #e5e7eb;
+            margin: 2em 0;
+        }
+        table {
+            border-collapse: collapse;
+            margin: 1.5em 0;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid #e5e7eb;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f5f5f5;
+            font-weight: 600;
+        }
+        @media (max-width: 768px) {
+            body {
+                font-size: 16px;
+            }
+            .reader-container {
+                padding: 20px 15px;
+            }
+            .close-button {
+                top: 10px;
+                right: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="close-button" onclick="window.close()">Close</button>
+    <div class="reader-container" id="content"></div>
+    <script>
+        // Markdown content passed from parent window
+        const markdown = ${JSON.stringify(convertedMarkdown)};
+        
+        // Convert to HTML and display
+        document.getElementById('content').innerHTML = marked.parse(markdown);
+        
+        // Handle ESC key to close
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                window.close();
+            }
+        });
+    <\/script>
+</body>
+</html>`;
+    
+    // Open reader mode window
+    const readerWindow = window.open('', 'readerMode', 'width=800,height=900,menubar=no,toolbar=no,location=no,status=no');
+    readerWindow.document.write(readerHTML);
+    readerWindow.document.close();
 }

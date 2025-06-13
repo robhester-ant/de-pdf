@@ -9,6 +9,8 @@ A powerful tool to convert PDF, HTML, and DOCX documents to clean Markdown forma
 - **Rich Text Preview**: Real-time preview of converted content during processing
 - **Multiple Copy Options**: Copy as plaintext, markdown, or rich text (Slack-compatible)
 - **Multiple Deployment Options**: Run as standalone web app, Electron desktop app, or Docker container
+- **URL Path Ingestion**: Convert URLs directly by visiting `localhost:3333/https://example.com/article`
+- **Reader Mode**: Clean, distraction-free reading view in a popup window
 
 ## Quick Start
 
@@ -41,7 +43,8 @@ npm start
 ## Project Structure
 
 - `app.py` - Main Flask application
-- `document-to-markdown.html` - Standalone HTML version
+- `templates/` - HTML templates for web interface
+- `static/` - CSS and JavaScript files
 - `electron-app/` - Electron desktop application
 - `standalone-docker/` - Dockerized version with all dependencies
 

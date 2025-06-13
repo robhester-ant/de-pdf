@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, Response, render_template, send_from_directory
+from flask import Flask, request, jsonify, Response, render_template, send_from_directory, redirect, url_for, abort
 import anthropic
 import pdfplumber
 from docx import Document
@@ -378,6 +378,28 @@ Article text:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
     
     return Response(generate(), mimetype='text/event-stream')
+
+# This MUST be the last route - it catches everything else
+@app.route('/<path:path>')
+def handle_url_path(path):
+    """Handle URLs passed as path parameters - must be last route!"""
+    # Debug logging
+    logger.info(f"Catch-all route triggered with path: {path}")
+    logger.info(f"Full request path: {request.path}")
+    logger.info(f"Request URL: {request.url}")
+    
+    # Get the full request path
+    full_path = request.path[1:]  # Remove leading slash
+    
+    # Check if this looks like a URL
+    if full_path.startswith(('http://', 'https://', 'ftp://')) or 'archive.ph' in full_path:
+        logger.info(f"Detected URL pattern, redirecting to: ?url={full_path}")
+        # Redirect to index with URL as query parameter
+        return redirect(url_for('index') + '?url=' + full_path)
+    else:
+        logger.info(f"Not a URL pattern, returning 404 for: {full_path}")
+        # Not a URL, return 404
+        abort(404)
 
 if __name__ == '__main__':
     # Flush stdout to ensure prints are visible

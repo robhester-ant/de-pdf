@@ -4,15 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This directory currently contains:
-- A PDF document: "Anthropic CEO Amodei Steers $61 Billion AI Powerhouse - Bloomberg.pdf"
-- An image file: "style.png"
+De-PDF is a document to markdown converter that uses Claude API to convert PDFs, HTML files, and web URLs into clean markdown format.
 
-No code structure or development files are present at this time.
+## Application Architecture
 
-## Important: Two Versions of the Application
-This project has TWO versions of the document converter that must be kept in sync:
-1. **Standalone HTML version**: `/document-to-markdown.html` - A single-file HTML/JS application
-2. **Docker/Electron version**: `/electron-app/index.html` and `/electron-app/renderer.js` - Used in the Docker container
+The application uses a Flask backend (`/app.py`) with:
+- Web interface served from `/templates/index.html`
+- JavaScript frontend in `/static/js/app.js`
+- Electron wrapper for desktop app in `/electron-app/`
+- Docker container support
 
-**CRITICAL**: When making UI or functionality changes, you MUST update BOTH versions and explicitly confirm to the user that both have been updated.
+## Key Features
+- PDF, HTML, and DOCX file conversion
+- URL to markdown conversion with Puppeteer support for JavaScript-rendered pages
+- Reader mode for clean reading experience
+- URL path ingestion:
+  - Direct: `localhost:3333?url=https://example.com/article`
+  - Path-based: `localhost:3333/https://example.com/article` (redirects to query param)
