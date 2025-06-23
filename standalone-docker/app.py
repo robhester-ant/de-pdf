@@ -606,7 +606,7 @@ def convert_to_markdown(text, api_key):
         text = text[:100000] + "\n\n[Article continues but was truncated due to length...]"
     
     message = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-opus-4-20250514",
         max_tokens=8192,  # Claude 4 supports up to 64K output tokens
         temperature=0,
         messages=[
@@ -773,10 +773,10 @@ def convert_stream():
             # Convert to markdown using Claude with streaming
             client = anthropic.Anthropic(api_key=api_key)
             
-            print("Starting Claude 3.5 Sonnet streaming response...")
+            print("Starting Claude Opus 4 streaming response...")
             
             stream = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-opus-4-20250514",
                 max_tokens=8192,  # Claude 4 supports up to 64K output tokens
                 temperature=0,
                 messages=[
