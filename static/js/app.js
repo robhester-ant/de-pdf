@@ -11,7 +11,10 @@ window.onload = async function() {
         if (result.hasKey) {
             showUploadSection();
             // Check for URL parameter after showing upload section
-            checkForURLParameter();
+            // Use requestAnimationFrame to ensure DOM updates are rendered
+            requestAnimationFrame(() => {
+                checkForURLParameter();
+            });
         }
     } catch (error) {
         console.error('Error checking API key:', error);
@@ -153,8 +156,12 @@ async function handleFile(file) {
                         } else if (data.done) {
                             document.getElementById('progress-container').style.display = 'none';
                             convertedMarkdown = accumulatedMarkdown;
+                            // Reset page title
+                            document.title = 'Document to Markdown Converter';
                         } else if (data.error) {
                             showError(data.error);
+                            // Reset page title
+                            document.title = 'Document to Markdown Converter';
                             break;
                         }
                     } catch (e) {
@@ -230,9 +237,13 @@ async function handleURL() {
                 document.getElementById('progress-container').style.display = 'none';
                 convertedMarkdown = accumulatedMarkdown;
                 eventSource.close();
+                // Reset page title
+                document.title = 'Document to Markdown Converter';
             } else if (data.error) {
                 showError(data.error);
                 eventSource.close();
+                // Reset page title
+                document.title = 'Document to Markdown Converter';
             }
         };
 
@@ -240,6 +251,8 @@ async function handleURL() {
             console.error('EventSource error:', error);
             showError('Failed to process URL. Please check if the site is accessible.');
             eventSource.close();
+            // Reset page title
+            document.title = 'Document to Markdown Converter';
         };
 
     } catch (error) {
@@ -377,13 +390,24 @@ function checkForURLParameter() {
             new URL(urlParam); // Validate URL
             document.getElementById('url-input').value = urlParam;
             
-            // Automatically trigger conversion after a short delay
+            // Immediately show loading state
+            document.getElementById('upload-area').style.display = 'none';
+            document.getElementById('url-input-container').style.display = 'none';
+            document.getElementById('progress-container').style.display = 'block';
+            document.getElementById('progress-fill').style.width = '10%';
+            document.getElementById('status-text').textContent = 'Preparing to fetch URL...';
+            
+            // Update page title to show processing
+            document.title = 'Converting URL... - Document to Markdown';
+            
+            // Trigger conversion after a very short delay to ensure UI updates
             setTimeout(() => {
                 console.log('Auto-converting URL from query:', urlParam);
                 handleURL();
-            }, 500);
+            }, 100);
         } catch (e) {
             console.error('Invalid URL in query parameter:', urlParam);
+            showError('Invalid URL provided in query parameter');
         }
     }
 }
