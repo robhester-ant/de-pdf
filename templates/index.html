@@ -9,7 +9,20 @@
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <div class="container">
+    <!-- Initial loading state for URL parameters -->
+    <div id="initial-loading" style="display: none;">
+        <div class="container">
+            <h1 style="margin: 50px 0 30px 0; font-family: 'Departure Mono', monospace; text-align: center;">De-PDF</h1>
+            <div class="progress-container" style="display: block; margin: 0 auto;">
+                <div class="status-text">Initializing converter...</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 20%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container" id="main-container">
         <div id="api-key-section">
             <h1>Document to Markdown Converter</h1>
             <p style="text-align: center; color: #6b7280; margin-bottom: 30px;">
@@ -60,6 +73,19 @@
         </div>
     </div>
 
+    <script>
+        // Immediate URL parameter check - runs before main app.js
+        (function() {
+            const searchParams = new URLSearchParams(window.location.search);
+            const urlParam = searchParams.get('url');
+            if (urlParam) {
+                // Show loading state immediately
+                document.getElementById('initial-loading').style.display = 'block';
+                document.getElementById('main-container').style.display = 'none';
+                document.title = 'Converting URL... - Document to Markdown';
+            }
+        })();
+    </script>
     <script src="/static/js/app.js"></script>
 </body>
 </html>

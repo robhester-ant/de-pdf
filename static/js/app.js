@@ -3,21 +3,89 @@ let convertedMarkdown = '';
 let eventSource = null;
 let accumulatedMarkdown = '';
 
+// Global variable to store URL parameter if present
+let pendingUrlConversion = null;
+
 // Check for saved API key on load
 window.onload = async function() {
+    // First, check if we have a URL parameter
+    const searchParams = new URLSearchParams(window.location.search);
+    const urlParam = searchParams.get('url');
+    
+    if (urlParam) {
+        // Validate URL
+        try {
+            new URL(urlParam);
+            // Store for later use
+            pendingUrlConversion = urlParam;
+        } catch (e) {
+            console.error('Invalid URL in query parameter:', urlParam);
+            // Hide loading and show error
+            document.getElementById('initial-loading').style.display = 'none';
+            document.getElementById('main-container').style.display = 'block';
+            // Will show error after main UI loads
+            setTimeout(() => showError('Invalid URL provided in query parameter'), 100);
+            return;
+        }
+        
+        // Initial loading is already shown by inline script
+        // Update the loading message
+        const statusText = document.querySelector('#initial-loading .status-text');
+        if (statusText) {
+            statusText.textContent = 'Checking API key...';
+        }
+    }
+    
     try {
         const response = await fetch('/check-api-key');
         const result = await response.json();
+        
         if (result.hasKey) {
-            showUploadSection();
-            // Check for URL parameter after showing upload section
-            // Use requestAnimationFrame to ensure DOM updates are rendered
-            requestAnimationFrame(() => {
-                checkForURLParameter();
-            });
+            if (pendingUrlConversion) {
+                // We have both API key and URL - start conversion immediately
+                // Hide initial loading and show main container
+                document.getElementById('initial-loading').style.display = 'none';
+                document.getElementById('main-container').style.display = 'block';
+                
+                // Show upload section briefly to set up DOM
+                showUploadSection();
+                
+                // Immediately start URL conversion
+                document.getElementById('url-input').value = pendingUrlConversion;
+                
+                // Hide upload UI and show progress
+                document.getElementById('upload-area').style.display = 'none';
+                document.getElementById('url-input-container').style.display = 'none';
+                document.getElementById('progress-container').style.display = 'block';
+                document.getElementById('progress-fill').style.width = '30%';
+                document.getElementById('status-text').textContent = 'Fetching URL...';
+                
+                // Start conversion without delay
+                handleURL();
+            } else {
+                // No URL parameter, show normal upload interface
+                showUploadSection();
+            }
+        } else {
+            // No API key
+            if (pendingUrlConversion) {
+                // Show API key input but indicate we'll process URL after
+                document.getElementById('initial-loading').style.display = 'none';
+                document.getElementById('main-container').style.display = 'block';
+                
+                // Add a notice about pending URL
+                const apiKeySection = document.getElementById('api-key-section');
+                const notice = document.createElement('p');
+                notice.style.cssText = 'text-align: center; color: #2563eb; margin-top: 20px;';
+                notice.textContent = 'URL detected - will convert after API key is saved';
+                apiKeySection.appendChild(notice);
+            }
         }
     } catch (error) {
         console.error('Error checking API key:', error);
+        // Hide loading on error
+        document.getElementById('initial-loading').style.display = 'none';
+        document.getElementById('main-container').style.display = 'block';
     }
     
     // Set up drag and drop after DOM is loaded
@@ -41,6 +109,22 @@ async function saveApiKey() {
         const result = await response.json();
         if (result.success) {
             showUploadSection();
+            
+            // Check if we have a pending URL conversion
+            if (pendingUrlConversion) {
+                // Set the URL and start conversion
+                document.getElementById('url-input').value = pendingUrlConversion;
+                
+                // Hide upload UI and show progress
+                document.getElementById('upload-area').style.display = 'none';
+                document.getElementById('url-input-container').style.display = 'none';
+                document.getElementById('progress-container').style.display = 'block';
+                document.getElementById('progress-fill').style.width = '30%';
+                document.getElementById('status-text').textContent = 'Fetching URL...';
+                
+                // Start conversion immediately
+                handleURL();
+            }
         }
     } catch (error) {
         showError('Failed to save API key: ' + error.message);
@@ -380,37 +464,11 @@ function resetUI() {
     }
 }
 
-function checkForURLParameter() {
-    // Check query parameters for URL
-    const searchParams = new URLSearchParams(window.location.search);
-    const urlParam = searchParams.get('url');
-    
-    if (urlParam) {
-        try {
-            new URL(urlParam); // Validate URL
-            document.getElementById('url-input').value = urlParam;
-            
-            // Immediately show loading state
-            document.getElementById('upload-area').style.display = 'none';
-            document.getElementById('url-input-container').style.display = 'none';
-            document.getElementById('progress-container').style.display = 'block';
-            document.getElementById('progress-fill').style.width = '10%';
-            document.getElementById('status-text').textContent = 'Preparing to fetch URL...';
-            
-            // Update page title to show processing
-            document.title = 'Converting URL... - Document to Markdown';
-            
-            // Trigger conversion after a very short delay to ensure UI updates
-            setTimeout(() => {
-                console.log('Auto-converting URL from query:', urlParam);
-                handleURL();
-            }, 100);
-        } catch (e) {
-            console.error('Invalid URL in query parameter:', urlParam);
-            showError('Invalid URL provided in query parameter');
-        }
-    }
-}
+// Removed checkForURLParameter function - URL parameters are now handled in window.onload
+
+// Store original page state for exiting reader mode
+let originalBodyContent = null;
+let isInReaderMode = false;
 
 function openReaderMode() {
     if (!convertedMarkdown) {
@@ -418,156 +476,173 @@ function openReaderMode() {
         return;
     }
     
-    // Create reader mode HTML
-    const readerHTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reader Mode</title>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #fafafa;
-            color: #333;
-            font-family: Georgia, 'Times New Roman', serif;
-            line-height: 1.8;
-            font-size: 18px;
-        }
-        .reader-container {
-            max-width: 700px;
-            margin: 0 auto;
-            padding: 40px 20px;
-            background-color: #fff;
-            min-height: 100vh;
-            box-shadow: 0 0 20px rgba(0,0,0,0.05);
-        }
-        .close-button {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #666;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: 14px;
-            z-index: 1000;
-        }
-        .close-button:hover {
-            background: #555;
-        }
-        h1, h2, h3, h4, h5, h6 {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-weight: 600;
-            margin: 1.5em 0 0.5em 0;
-            line-height: 1.3;
-        }
-        h1 { font-size: 2.2em; }
-        h2 { font-size: 1.8em; }
-        h3 { font-size: 1.4em; }
-        p {
-            margin: 0 0 1.5em 0;
-        }
-        blockquote {
-            margin: 1.5em 0;
-            padding-left: 1em;
-            border-left: 4px solid #ddd;
-            color: #666;
-            font-style: italic;
-        }
-        code {
-            background-color: #f5f5f5;
-            padding: 2px 4px;
-            border-radius: 3px;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 0.9em;
-        }
-        pre {
-            background-color: #f5f5f5;
-            padding: 1em;
-            border-radius: 4px;
-            overflow-x: auto;
-            font-size: 0.9em;
-            line-height: 1.5;
-        }
-        pre code {
-            background: none;
-            padding: 0;
-        }
-        ul, ol {
-            margin: 1em 0;
-            padding-left: 2em;
-        }
-        li {
-            margin: 0.5em 0;
-        }
-        a {
-            color: #2563eb;
-            text-decoration: underline;
-        }
-        a:hover {
-            color: #1d4ed8;
-        }
-        hr {
-            border: none;
-            border-top: 1px solid #e5e7eb;
-            margin: 2em 0;
-        }
-        table {
-            border-collapse: collapse;
-            margin: 1.5em 0;
-            width: 100%;
-        }
-        th, td {
-            border: 1px solid #e5e7eb;
-            padding: 8px 12px;
-            text-align: left;
-        }
-        th {
-            background-color: #f5f5f5;
-            font-weight: 600;
-        }
-        @media (max-width: 768px) {
-            body {
+    // Save current body content
+    originalBodyContent = document.body.innerHTML;
+    isInReaderMode = true;
+    
+    // Create reader mode content
+    const readerContent = `
+        <style id="reader-mode-styles">
+            @font-face {
+                font-family: 'Departure Mono';
+                src: url('/static/font/DepartureMono-Regular.woff2') format('woff2'),
+                     url('/static/font/DepartureMono-Regular.woff') format('woff'),
+                     url('/static/font/DepartureMono-Regular.otf') format('opentype');
+                font-weight: 400;
+                font-style: normal;
+            }
+            body.reader-mode {
+                margin: 0;
+                padding: 0;
+                background-color: white;
+                color: #333;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                line-height: 1.7;
                 font-size: 16px;
             }
             .reader-container {
-                padding: 20px 15px;
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 40px 20px;
+                background-color: white;
+                min-height: 100vh;
             }
-            .close-button {
-                top: 10px;
-                right: 10px;
+            .reader-controls {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                display: flex;
+                gap: 10px;
+                z-index: 1000;
             }
-        }
-    </style>
-</head>
-<body>
-    <button class="close-button" onclick="window.close()">Close</button>
-    <div class="reader-container" id="content"></div>
-    <script>
-        // Markdown content passed from parent window
-        const markdown = ${JSON.stringify(convertedMarkdown)};
-        
-        // Convert to HTML and display
-        document.getElementById('content').innerHTML = marked.parse(markdown);
-        
-        // Handle ESC key to close
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                window.close();
+            .reader-button {
+                background-color: #2563eb;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-family: 'Departure Mono', monospace;
+                font-size: 14px;
+                transition: background-color 0.2s;
             }
-        });
-    <\/script>
-</body>
-</html>`;
+            .reader-button:hover {
+                background-color: #1d4ed8;
+            }
+            .reader-mode h1, .reader-mode h2, .reader-mode h3, .reader-mode h4, .reader-mode h5, .reader-mode h6 {
+                font-weight: bold;
+            }
+            .reader-mode h1 { font-size: 2em; margin: 0.67em 0; }
+            .reader-mode h2 { font-size: 1.5em; margin: 0.75em 0; }
+            .reader-mode h3 { font-size: 1.17em; margin: 0.83em 0; }
+            .reader-mode h4 { font-size: 1em; margin: 1.12em 0; }
+            .reader-mode h5 { font-size: 0.83em; margin: 1.5em 0; }
+            .reader-mode h6 { font-size: 0.75em; margin: 1.67em 0; }
+            .reader-mode p {
+                margin: 1em 0;
+            }
+            .reader-mode blockquote {
+                margin: 1em 0;
+                padding-left: 1em;
+                border-left: 4px solid #e5e7eb;
+                color: #6b7280;
+            }
+            .reader-mode code {
+                background-color: #f3f4f6;
+                padding: 2px 4px;
+                border-radius: 3px;
+                font-family: monospace;
+                font-size: 0.9em;
+            }
+            .reader-mode pre {
+                background-color: #f3f4f6;
+                padding: 12px;
+                border-radius: 4px;
+                overflow-x: auto;
+            }
+            .reader-mode pre code {
+                background-color: transparent;
+                padding: 0;
+            }
+            .reader-mode ul, .reader-mode ol {
+                margin: 1em 0;
+                padding-left: 2em;
+            }
+            .reader-mode li {
+                margin: 0.5em 0;
+            }
+            .reader-mode a {
+                color: #2563eb;
+                text-decoration: underline;
+            }
+            .reader-mode a:hover {
+                color: #1d4ed8;
+            }
+            .reader-mode hr {
+                border: none;
+                border-top: 1px solid #e5e7eb;
+                margin: 2em 0;
+            }
+            .reader-mode table {
+                border-collapse: collapse;
+                margin: 1em 0;
+            }
+            .reader-mode th, .reader-mode td {
+                border: 1px solid #e5e7eb;
+                padding: 8px;
+            }
+            .reader-mode th {
+                background-color: #f3f4f6;
+                font-weight: bold;
+            }
+            @media (max-width: 768px) {
+                body.reader-mode {
+                    font-size: 16px;
+                }
+                .reader-container {
+                    padding: 20px 15px;
+                }
+                .reader-controls {
+                    top: 10px;
+                    right: 10px;
+                }
+            }
+        </style>
+        <div class="reader-controls">
+            <button class="reader-button" onclick="exitReaderMode()">Exit Reader Mode</button>
+        </div>
+        <div class="reader-container" id="reader-content"></div>
+    `;
     
-    // Open reader mode window
-    const readerWindow = window.open('', 'readerMode', 'width=800,height=900,menubar=no,toolbar=no,location=no,status=no');
-    readerWindow.document.write(readerHTML);
-    readerWindow.document.close();
+    // Replace body content and add reader mode class
+    document.body.innerHTML = readerContent;
+    document.body.className = 'reader-mode';
+    
+    // Convert markdown to HTML and display
+    document.getElementById('reader-content').innerHTML = marked.parse(convertedMarkdown);
+    
+    // Add keyboard shortcut to exit
+    document.addEventListener('keydown', handleReaderModeKeydown);
+}
+
+function exitReaderMode() {
+    if (!isInReaderMode || !originalBodyContent) return;
+    
+    // Restore original content
+    document.body.innerHTML = originalBodyContent;
+    document.body.className = '';
+    
+    // Re-attach event listeners and restore state
+    window.onload = null; // Prevent re-initialization
+    isInReaderMode = false;
+    originalBodyContent = null;
+    
+    // Remove reader mode keyboard listener
+    document.removeEventListener('keydown', handleReaderModeKeydown);
+}
+
+function handleReaderModeKeydown(e) {
+    if (e.key === 'Escape') {
+        exitReaderMode();
+    }
 }
