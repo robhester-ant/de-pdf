@@ -476,164 +476,70 @@ function openReaderMode() {
         return;
     }
     
-    // Save current body content
+    // Check if already in reader mode
+    if (isInReaderMode) {
+        return;
+    }
+    
+    // Remove any existing reader mode wrapper first
+    const existingReader = document.getElementById('reader-mode-wrapper');
+    if (existingReader) {
+        existingReader.remove();
+    }
+    
+    // Save current state
     originalBodyContent = document.body.innerHTML;
     isInReaderMode = true;
     
-    // Create reader mode content
-    const readerContent = `
-        <style id="reader-mode-styles">
-            @font-face {
-                font-family: 'Departure Mono';
-                src: url('/static/font/DepartureMono-Regular.woff2') format('woff2'),
-                     url('/static/font/DepartureMono-Regular.woff') format('woff'),
-                     url('/static/font/DepartureMono-Regular.otf') format('opentype');
-                font-weight: 400;
-                font-style: normal;
-            }
-            body.reader-mode {
-                margin: 0;
-                padding: 0;
-                background-color: white;
-                color: #333;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                line-height: 1.7;
-                font-size: 16px;
-            }
-            .reader-container {
-                max-width: 800px;
-                margin: 0 auto;
-                padding: 40px 20px;
-                background-color: white;
-                min-height: 100vh;
-            }
-            .reader-controls {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                display: flex;
-                gap: 10px;
-                z-index: 1000;
-            }
-            .reader-button {
-                background-color: #2563eb;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 6px;
-                cursor: pointer;
-                font-family: 'Departure Mono', monospace;
-                font-size: 14px;
-                transition: background-color 0.2s;
-            }
-            .reader-button:hover {
-                background-color: #1d4ed8;
-            }
-            .reader-mode h1, .reader-mode h2, .reader-mode h3, .reader-mode h4, .reader-mode h5, .reader-mode h6 {
-                font-weight: bold;
-            }
-            .reader-mode h1 { font-size: 2em; margin: 0.67em 0; }
-            .reader-mode h2 { font-size: 1.5em; margin: 0.75em 0; }
-            .reader-mode h3 { font-size: 1.17em; margin: 0.83em 0; }
-            .reader-mode h4 { font-size: 1em; margin: 1.12em 0; }
-            .reader-mode h5 { font-size: 0.83em; margin: 1.5em 0; }
-            .reader-mode h6 { font-size: 0.75em; margin: 1.67em 0; }
-            .reader-mode p {
-                margin: 1em 0;
-            }
-            .reader-mode blockquote {
-                margin: 1em 0;
-                padding-left: 1em;
-                border-left: 4px solid #e5e7eb;
-                color: #6b7280;
-            }
-            .reader-mode code {
-                background-color: #f3f4f6;
-                padding: 2px 4px;
-                border-radius: 3px;
-                font-family: monospace;
-                font-size: 0.9em;
-            }
-            .reader-mode pre {
-                background-color: #f3f4f6;
-                padding: 12px;
-                border-radius: 4px;
-                overflow-x: auto;
-            }
-            .reader-mode pre code {
-                background-color: transparent;
-                padding: 0;
-            }
-            .reader-mode ul, .reader-mode ol {
-                margin: 1em 0;
-                padding-left: 2em;
-            }
-            .reader-mode li {
-                margin: 0.5em 0;
-            }
-            .reader-mode a {
-                color: #2563eb;
-                text-decoration: underline;
-            }
-            .reader-mode a:hover {
-                color: #1d4ed8;
-            }
-            .reader-mode hr {
-                border: none;
-                border-top: 1px solid #e5e7eb;
-                margin: 2em 0;
-            }
-            .reader-mode table {
-                border-collapse: collapse;
-                margin: 1em 0;
-            }
-            .reader-mode th, .reader-mode td {
-                border: 1px solid #e5e7eb;
-                padding: 8px;
-            }
-            .reader-mode th {
-                background-color: #f3f4f6;
-                font-weight: bold;
-            }
-            @media (max-width: 768px) {
-                body.reader-mode {
-                    font-size: 16px;
-                }
-                .reader-container {
-                    padding: 20px 15px;
-                }
-                .reader-controls {
-                    top: 10px;
-                    right: 10px;
-                }
-            }
-        </style>
-        <div class="reader-controls">
-            <button class="reader-button" onclick="exitReaderMode()">Exit Reader Mode</button>
+    // Hide current content instead of replacing it
+    const mainContainer = document.getElementById('main-container');
+    if (mainContainer) {
+        mainContainer.style.display = 'none';
+    }
+    
+    // Create reader mode container
+    const readerDiv = document.createElement('div');
+    readerDiv.id = 'reader-mode-wrapper';
+    readerDiv.innerHTML = `
+        <div class="reader-controls" style="position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 1000;">
+            <button class="reader-button" onclick="exitReaderMode()" style="background-color: #2563eb; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-family: 'Departure Mono', monospace; font-size: 14px; transition: background-color 0.2s;">Exit Reader Mode</button>
         </div>
-        <div class="reader-container" id="reader-content"></div>
+        <div style="max-width: 800px; margin: 0 auto; padding: 40px 20px; background-color: white; min-height: 100vh;">
+            <div id="reader-content" class="markdown-display" style="width: 100%; max-width: 800px; padding: 20px; border: none; font-size: 16px; line-height: 1.7; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0 auto;"></div>
+        </div>
     `;
     
-    // Replace body content and add reader mode class
-    document.body.innerHTML = readerContent;
-    document.body.className = 'reader-mode';
+    // Append to body
+    document.body.appendChild(readerDiv);
     
-    // Convert markdown to HTML and display
-    document.getElementById('reader-content').innerHTML = marked.parse(convertedMarkdown);
+    // Parse and display markdown content
+    const readerContent = document.getElementById('reader-content');
+    if (readerContent && typeof marked !== 'undefined') {
+        readerContent.innerHTML = marked.parse(convertedMarkdown);
+    } else {
+        // Fallback if marked is not available
+        readerContent.textContent = convertedMarkdown;
+    }
     
     // Add keyboard shortcut to exit
     document.addEventListener('keydown', handleReaderModeKeydown);
 }
 
 function exitReaderMode() {
-    if (!isInReaderMode || !originalBodyContent) return;
+    if (!isInReaderMode) return;
     
-    // Restore original content
-    document.body.innerHTML = originalBodyContent;
-    document.body.className = '';
+    // Remove reader mode wrapper
+    const readerWrapper = document.getElementById('reader-mode-wrapper');
+    if (readerWrapper) {
+        readerWrapper.remove();
+    }
     
-    // Re-attach event listeners and restore state
-    window.onload = null; // Prevent re-initialization
+    // Show original content
+    const mainContainer = document.getElementById('main-container');
+    if (mainContainer) {
+        mainContainer.style.display = 'block';
+    }
+    
     isInReaderMode = false;
     originalBodyContent = null;
     

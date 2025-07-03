@@ -5,7 +5,7 @@ A powerful tool to convert PDF, HTML, and DOCX documents to clean Markdown forma
 ## Features
 
 - **Multiple Input Formats**: Supports PDF, HTML, and DOCX files
-- **AI-Powered Conversion**: Uses Claude 4 Sonnet for intelligent text cleanup and formatting
+- **AI-Powered Conversion**: Uses Claude Opus for intelligent text cleanup and formatting
 - **Rich Text Preview**: Real-time preview of converted content during processing
 - **Multiple Copy Options**: Copy as plaintext, markdown, or rich text (Slack-compatible)
 - **Multiple Deployment Options**: Run as standalone web app, Electron desktop app, or Docker container
